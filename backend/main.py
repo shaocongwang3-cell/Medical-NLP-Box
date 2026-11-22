@@ -1,11 +1,13 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 from services.ner_service import NERService
 from services.std_service import StdService
 from services.abbr_service import AbbrService
 from services.corr_service import CorrService
 from services.gen_service import GenService
+from utils.llm_factory import LLMNotConfiguredError
 from typing import List, Dict, Optional, Literal, Union, Any
 import logging
 
@@ -25,12 +27,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 初始化各个服务
-ner_service = NERService()  # 命名实体识别服务
-standardization_service = StdService()  # 术语标准化服务
-abbr_service = AbbrService()  # 缩写扩展服务
-gen_service = GenService()  # 文本生成服务
-corr_service = CorrService()  # 拼写纠正服务
+# 服务按需初始化，避免启动时立刻下载大模型
+ner_service = NERService()
+abbr_service = AbbrService()
+gen_service = GenService()
+corr_service = CorrService()
 
 # 基础模型类
 class BaseInputModel(BaseModel):
@@ -178,7 +179,7 @@ async def standardization(input: TextInput):
         standardization_service = StdService(
             provider=input.embeddingOptions.provider,
             model=input.embeddingOptions.model,
-            db_path=f"db/{input.embeddingOptions.dbName}.db",
+            db_path=input.embeddingOptions.dbName,
             collection_name=input.embeddingOptions.collectionName
         )
 
@@ -287,7 +288,17 @@ async def generate_medical_content(input: GenInput):
         logger.error(f"Error in medical content generation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.exception_handler(LLMNotConfiguredError)
+async def llm_not_configured_handler(request: Request, exc: LLMNotConfiguredError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
 # 启动服务器
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

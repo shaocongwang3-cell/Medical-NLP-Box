@@ -12,11 +12,18 @@ class NERService:
     使用 Clinical-AI-Apollo/Medical-NER 模型进行医疗文本的实体识别
     """
     def __init__(self):
-        # 初始化 NER 模型，使用 GPU 如果可用
-        self.pipe = pipeline("token-classification", 
-                           model="Clinical-AI-Apollo/Medical-NER", 
-                           aggregation_strategy='simple',
-                           device=0 if torch.cuda.is_available() else -1)
+        self.pipe = None
+
+    def _get_pipe(self):
+        if self.pipe is None:
+            logger.info("Loading Medical-NER model...")
+            self.pipe = pipeline(
+                "token-classification",
+                model="Clinical-AI-Apollo/Medical-NER",
+                aggregation_strategy="simple",
+                device=0 if torch.cuda.is_available() else -1,
+            )
+        return self.pipe
   
     def process(self, text, options, term_types):
         """
@@ -31,7 +38,7 @@ class NERService:
             包含识别出的实体和原始文本的字典
         """
         # 使用模型进行实体识别
-        result = self.pipe(text)
+        result = self._get_pipe()(text)
         
         # 确保结果是实体列表
         if isinstance(result, dict):
@@ -61,7 +68,7 @@ class NERService:
             entity = result[i]
             entity['score'] = float(entity['score'])
 
-            if options['combineBioStructure'] and entity['entity_group'] in ['SIGN_SYMPTOM', 'DISEASE_DISORDER']:
+            if options.get('combineBioStructure') and entity['entity_group'] in ['SIGN_SYMPTOM', 'DISEASE_DISORDER']:
                 # 检查并合并生物结构
                 combined_entity = self._try_combine_with_bio_structure(result, i, text)
                 if combined_entity:

@@ -1,9 +1,7 @@
-from langchain_community.llms import Ollama
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from typing import Dict
 from services.std_service import StdService
-import os
+from utils.llm_factory import get_llm
 import logging
 
 # 配置日志
@@ -41,7 +39,7 @@ class AbbrService:
             return StdService(
                 provider=embedding_options.get("provider", "huggingface"),
                 model=embedding_options.get("model", "BAAI/bge-m3"),
-                db_path=f"db/{embedding_options.get('dbName', 'snomed_bge_m3')}.db",
+                db_path=embedding_options.get("dbName", "snomed_bge_m3"),
                 collection_name=embedding_options.get("collectionName", "concepts_only_name")
             )
         except Exception as e:
@@ -66,16 +64,7 @@ class AbbrService:
         provider = llm_options.get("provider", "ollama")
         model = llm_options.get("model", "llama3.1:8b")
         
-        if provider == "ollama":
-            return Ollama(model=model)
-        elif provider == "openai":
-            return ChatOpenAI(
-                model=model,
-                temperature=0,
-                api_key=os.getenv("OPENAI_API_KEY")
-            )
-        else:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
+        return get_llm(llm_options)
         
     def simple_ollama_expansion(self, text: str, llm_options: dict) -> Dict:
         """
@@ -167,4 +156,32 @@ class AbbrService:
             }
         except Exception as e:
             logger.error(f"Error in llm_rank_query_db: {str(e)}")
+            raise ValueError(f"Failed to process abbreviation expansion: {str(e)}")
+
+    def query_db_llm_rerank(self, text: str, context: str, llm_options: dict, embedding_options: dict) -> Dict:
+        """先检索相似术语，再交给 LLM 根据上下文重排序。"""
+        try:
+            self.std_service = self._get_std_service(embedding_options)
+            candidates = self.std_service.search_similar_terms(text)
+            llm = self._get_llm(llm_options)
+            rerank_prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are a medical terminology expert. Rank the candidate expansions for the abbreviation given the context. Return the best expansion and a short reason."),
+                ("human", "Abbreviation: {text}\nContext: {context}\nCandidates: {candidates}"),
+            ])
+            chain = rerank_prompt | llm
+            result = chain.invoke({
+                "text": text,
+                "context": context,
+                "candidates": str(candidates),
+            })
+            ranked = result.content if hasattr(result, "content") else str(result)
+            return {
+                "input": text,
+                "context": context,
+                "candidates": candidates,
+                "ranked": ranked,
+                "method": "query_db_llm_rerank",
+            }
+        except Exception as e:
+            logger.error(f"Error in query_db_llm_rerank: {str(e)}")
             raise ValueError(f"Failed to process abbreviation expansion: {str(e)}") 

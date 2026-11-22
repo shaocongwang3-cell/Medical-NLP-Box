@@ -68,6 +68,7 @@ coverage
 # *.db
 # backend/db/snomed_bge_m3.db
 backend/db/.snomed_bge_m3.db.lock
+backend/db/snomed_bge_m3/
 
 # Parcel bundler cache
 .cache
@@ -106,3 +107,5 @@ dist/
 milvus_db/
 snomed_db/
 *CONCEPT*.csv
+
+.idea

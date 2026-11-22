@@ -1,82 +1,71 @@
-# 医疗网站项目
+# 医疗 NLP 工具箱（Windows）
 
-一个使用 Next.js 和 Tailwind CSS 构建的现代化、响应式医疗网站，提供全面的医疗服务平台。 
-<a href="https://u.geekbang.org/subject/airag/1009927"> 极客时间RAG进阶训练营</a>
+本项目提供医疗文本 NER、术语标准化、缩写扩展、拼写纠正和病历生成。已按 **Windows + Miniconda** 调整：向量库使用 **Chroma**（不再使用 Windows 不支持的 Milvus Lite）。
 
-学习链接： https://u.geekbang.org/subject/airag/1009927 
+## 环境
 
+- 已创建 conda 环境：`medical-nlp`（Python 3.11）
+- 机器：NVIDIA GPU（CUDA 12.x）时安装 CUDA 版 PyTorch
+- 前端：Node.js（建议 20 LTS；当前 Node 24 也可尝试）
 
+激活环境：
 
-![医疗网站首页](frontend/public/images/medical-page.png)
-
-
-## 功能特点
-
-
-
-## 技术栈
-
-- **前端框架**: Next.js
-- **样式**: Tailwind CSS
-- **图标**: Heroicons
-- **动画**: Framer Motion
-- **状态管理**: React Context
-- **表单处理**: React Hook Form
-- **API 集成**: RESTful APIs
-
-## 开始使用
-
-1. 克隆仓库
-2. 安装依赖：
-   ```bash
-   npm install
-   ```
-3. 运行开发服务器：
-   ```bash
-   npm start
-   ```
-4. 在浏览器中打开 [http://localhost:3000](http://localhost:3000)
-
-## 项目结构
-
-```
-medical-website/
-├── app/
-│   ├── layout.tsx
-│   ├── page.tsx
-│   └── globals.css
-├── components/
-│   ├── layout/
-│   │   ├── Header.tsx
-│   │   ├── Footer.tsx
-│   │   └── Navigation.tsx
-│   ├── home/
-│   │   ├── HeroSection.tsx
-│   │   ├── ServiceCategories.tsx
-│   │   ├── FeaturedServices.tsx
-│   │   ├── WhyChooseUs.tsx
-│   │   ├── DoctorProfiles.tsx
-│   │   ├── Testimonials.tsx
-│   │   └── NewsSection.tsx
-│   └── ui/
-│       ├── Button.tsx
-│       ├── Card.tsx
-│       └── Icons.tsx
-├── public/
-│   └── images/
-├── styles/
-│   └── globals.css
-└── package.json
+```bat
+call D:\miniconda3\condabin\conda.bat activate medical-nlp
 ```
 
-## 参与贡献
+## 安装依赖
 
-1. Fork 本仓库
-2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m '添加一些特性'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个 Pull Request
+```bat
+call D:\miniconda3\condabin\conda.bat activate medical-nlp
+python -m pip install torch --index-url https://download.pytorch.org/whl/cu124
+python -m pip install -r requirements_win.txt
+cd frontend
+npm install
+```
 
-## 许可证
+## 构建术语向量库
 
-本项目采用 MIT 许可证 - 查看 LICENSE 文件了解详情
+首次使用「术语标准化」前，在项目根目录执行：
+
+```bat
+call D:\miniconda3\condabin\conda.bat activate medical-nlp
+cd backend
+python tools\create_chroma_db.py
+```
+
+会下载 `BAAI/bge-m3` 并把 `data/SNOMED_5000.csv` 写入 `backend/db/snomed_bge_m3`。
+
+## 启动
+
+后端（工作目录必须是 `backend`）：
+
+```bat
+scripts\start-backend.bat
+```
+
+或：
+
+```bat
+call D:\miniconda3\condabin\conda.bat activate medical-nlp
+cd backend
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+前端：
+
+```bat
+scripts\start-frontend.bat
+```
+
+浏览器打开 http://localhost:3000 ，后端 API 为 http://localhost:8000 。
+
+## 功能说明
+
+| 页面 | 是否依赖大模型 | 说明 |
+|------|----------------|------|
+| NER | 否 | HuggingFace `Clinical-AI-Apollo/Medical-NER` |
+| 术语标准化 | 否 | Chroma + `BAAI/bge-m3` |
+| 缩写 / 纠错 / 生成 | 是 | 当前未接 Ollama；接口会返回明确提示 |
+
+大模型可稍后安装 Ollama，或配置 `OPENAI_API_KEY` 后在页面选择 OpenAI。

@@ -1,8 +1,6 @@
-from langchain_community.llms import Ollama
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from typing import Dict
-import os
+from utils.llm_factory import get_llm
 import logging
 
 # 配置日志
@@ -33,16 +31,7 @@ class CorrService:
         provider = llm_options.get("provider", "ollama")
         model = llm_options.get("model", "llama3.1:8b")
         
-        if provider == "ollama":
-            return Ollama(model=model)
-        elif provider == "openai":
-            return ChatOpenAI(
-                model=model,
-                temperature=0,
-                api_key=os.getenv("OPENAI_API_KEY")
-            )
-        else:
-            raise ValueError(f"Unsupported LLM provider: {provider}")
+        return get_llm(llm_options)
         
     def correct_spelling(self, text: str, llm_options: dict) -> Dict:
         """

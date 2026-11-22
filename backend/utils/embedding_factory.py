@@ -6,6 +6,7 @@ from langchain_openai import OpenAIEmbeddings
 import boto3
 import os
 from utils.embedding_config import EmbeddingProvider, EmbeddingConfig
+from config import resolve_model_path
 
 class EmbeddingFactory:
     @staticmethod
@@ -29,8 +30,15 @@ class EmbeddingFactory:
             )
             
         elif config.provider == EmbeddingProvider.HUGGINGFACE:
+            try:
+                import torch
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+            except Exception:
+                device = "cpu"
             return HuggingFaceEmbeddings(
-                model_name=config.model_name
+                model_name=resolve_model_path(config.model_name),
+                model_kwargs={"device": device},
+                encode_kwargs={"normalize_embeddings": True},
             )
             
         raise ValueError(f"Unsupported embedding provider: {config.provider}")
